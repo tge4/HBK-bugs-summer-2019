@@ -1,0 +1,78 @@
+---
+title: "W6 and W9 stacked bar charts over time"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = 'C:/Users/tyler/OneDrive/Documents/Huang Summer/Data Files')
+#packages needed
+library("magrittr")
+library("dplyr")
+library("tidyr")
+library("lubridate")
+library("ggplot2")
+```
+
+# Step 1: 
+step working directory and load libraries
+
+```{r cars}
+ ws <- read.csv("All watersheds.csv")
+
+```
+
+# Step 2
+Tidy the data (create variables for taxon and size), then summarize the number od insects from a specific taxon seen on all of the traps collected in a specific week. 
+```{r pressure}
+ ws_tidy <- ws %>% 
+  gather("Dipteran_Large","Terrestrial_Large","Caddisfly_Large","Mayfly_Large","Stonefly_Large",
+         "Other_Large","Dipteran_Small","Terrestrial_Small", "Other_Small", key ="invert_size", value = "count")%>%
+  separate(invert_size, into=c("invert", "size"), sep = "_") %>%   #making invertebrate type and size into separate variables
+  mutate(count_NA = ifelse(is.na(count)==TRUE, 0, count)) %>%  dplyr::select(-count)  
+
+##Note that here we have variables of watershed, date, trap, type of macroinvertebrate, size, and count 
+
+head(ws_tidy)
+
+aq <- c("Caddisfly", "Dipteran", "Mayfly", "Stonefly")
+
+ws_tidy <-  ws_tidy %>%  mutate(date = lubridate::mdy(Date)) %>% 
+  dplyr::select(-Date) %>% 
+  dplyr::select(Watershed, date, Trap, invert, size, count_NA) 
+
+ws_sum <- ws_tidy %>% group_by(Watershed, date, invert, size) %>% filter(invert %in% aq)%>% 
+  summarize(count_sum = sum(count_NA))
+head(ws_sum)
+##Note that here we have variables of watershed, date,  type of macroinvertebrate, size, and a total count for all of the traps
+
+```
+
+# Step 3 
+
+Produces two stacked bar charts side by side 
+```{r}
+#W6 and 9
+ggplot(NULL, aes(x = date, y = count_sum, fill = invert))+ 
+  geom_bar(data = ws_sum %>% filter(Watershed == "9"), stat = 'identity')+
+  geom_bar(data = ws_sum %>% filter(Watershed == "6"), stat = 'identity')+ facet_wrap(~Watershed)+
+  ggtitle("Insects Collected from W6, W9 (2018)")+ labs(y = "Aquatic Insects Collected", x = "Date") + 
+  theme(axis.title = element_text(size=16, color='black', face="bold"), 
+   axis.text = element_text(size=12, color='black'), legend.position = 'right',
+   legend.text = element_text(size = 12))
+{rfig.width = 30}
+```
+ 
+# Step 4
+
+Produces one stacked bar chart with the information from both watersheds. 
+
+```{r}
+ggplot(NULL, aes(x = date, y = count_sum, fill = invert))+ 
+  geom_bar(data = ws_sum %>% filter(Watershed == "9"), stat = "identity")+
+  geom_bar(data = ws_sum %>% filter(Watershed == "6"), stat = "identity")+ facet_wrap(~Watershed)+
+  ggtitle("Insects Collected from W6, W9 (2018)")+ labs(y = "Aquatic Insects Collected", x = "Date") + 
+  theme(axis.title = element_text(size=16, color='black', face="bold"), 
+        axis.text = element_text(size=12, color='black'), legend.position = 'none')
+```
+ 

@@ -1,0 +1,81 @@
+---
+title: "W9 Bar Chart all invert v time by taxa"
+output: html_document
+---
+Goal: To create a stacked bar chart of all of the macroinvertebrates counted from the sticky traps collected from watershed 9 between 5/21/18 and 11/12/18. The end product will be stacked based on the order of the insects. 
+
+# Step 1
+
+Before we get to data organization,load the appropriate libraries and set the working directory as the folder containing your data files. 
+
+```{r setup}
+
+#packages needed
+library("magrittr")
+library("dplyr")
+library("tidyr")
+library("lubridate")
+library("ggplot2")
+
+setwd("C:/Users/tyler/OneDrive/Documents/Huang Summer/Data Files")
+
+#load in a file
+ws9 <- read.csv("Sticky trap data - Watershed 9.csv")
+```
+
+
+# Step 2
+
+Next, we will be tidying the data set. For more information on what tidy data is, visit the site [here](https://ramnathv.github.io/pycon2014-r/explore/tidy.html). The first step is to make all of the columns variables and each row a different observation, which is a singular type of insect in this case. The variables are the date the trap was retrieved, the trap's number, the taxon, and a count of how many bugs there were in that category. 
+
+```{r cars}
+ws9_tidy <- ws9 %>% gather("Dipteran_large","Terrestrial_large","Caddisfly_large","Mayfly_large",
+               "Stonefly_large","Other_large","Dipteran_small","Terrestrial_small","Other_small", key ="invert_size", value = 
+                 "count"
+      ) %>% 
+separate(invert_size, into=c("invert", "size"), sep = "_")   #making invertebrate type and size into separate variables
+  
+  View(ws9_tidy)
+
+str(ws9_tidy)
+  
+```
+
+In the next step, the date is changed from a character to the lubridate format and the NA values for count are replaced with zeroes. 
+
+```{r echo=FALSE}
+#mutate changes things in data frames
+ws9_tidy = ws9_tidy %>% mutate(count_new = ifelse(is.na(count) == TRUE, 0, count)) %>% 
+  dplyr::select(-count) %>%  #specifies which package to look for select in
+  rename("trap" = "Trap..", "date" = "Date") %>% 
+mutate(date_lub = lubridate::mdy(date)) %>% 
+  dplyr::select(-date) %>% 
+  dplyr::select(date_lub, trap, invert, size, count_new)
+
+View(ws9_tidy)
+```
+
+Next, the data is summarized so that the variables are: the date in lubridate format, the taxon of the invertebrate, whether they were large or small, and the count of all of the such bugs collected from all of the traps on a specific date.
+```{r}
+
+ws9_sum <- ws9_tidy %>% group_by(date_lub, invert, size) %>% 
+  summarize(count_sum = sum(count_new))
+
+View(ws9_sum)
+```
+
+# Step 3
+Finally, we will create the plot itself. 
+
+```{r }
+ggplot(ws9_sum %>% filter(invert == "Dipteran"), aes(x = date_lub, y = count_sum)) +
+  geom_bar(stat = "identity")
+
+ggplot(ws9_sum, aes(x = date_lub, y = count_sum)) + 
+  geom_bar(stat = "identity", aes(fill = invert))
+
+```
+
+
+
+

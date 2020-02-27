@@ -1,0 +1,117 @@
+---
+title: "w9 and hbk bar chart dipterans by site"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+opts_knit$set(root.dir = "C:/Users/tyler/OneDrive/Documents/Huang Summer/Data Files/")
+
+```
+
+# Step 1: 
+Set working directory and load files. I started with two separate data files, one with all of the data from HBK and one from all of the data from watershed 9 
+
+```{r cars}
+# start with packages needed
+library("magrittr")
+library("dplyr")
+library("tidyr")
+library("lubridate")
+library("ggplot2")
+```
+
+# Step 2: 
+Load data from watershed 9 into the data set, clean by changing the taxon and size as a variable, not an observation. 
+
+```{r } 
+ws9 <- read.csv("Sticky trap data - Watershed 9.csv")
+
+
+names(ws9)
+ws9_tidy <- ws9 %>% gather("Dipteran_large","Terrestrial_large","Caddisfly_large","Mayfly_large","Stonefly_large","Other_large","Dipteran_small","Terrestrial_small","Other_small", key ="invert_size", value = "count") %>% 
+  separate(invert_size, into=c("invert", "size"), sep = "_") %>%  #making invertebrate type and size into separate variables
+  
+  
+  #mutate changes things in data frames
+  mutate(count_new = ifelse(is.na(count) == TRUE, 0, count)) %>% 
+  dplyr::select(-count) %>%  #specifies which package to look for select in
+  rename("trap" = "Trap..", "date" = "Date") %>% 
+  mutate(date_lub = lubridate::mdy(date)) %>% 
+  dplyr::select(-date) %>% 
+  dplyr::select(date_lub, trap, invert, size, count_new) %>% 
+  rename("date" = "date_lub") %>% 
+ filter(date >= as.Date('2018-07-08')) #this line adjusts the dates so they'll be in the same range
+
+```
+
+Next, I put a label on all of the data so when I compare it to the data from the hubbard brook watershed, it'll be easy to distinguish. 
+```{r }
+ View(ws9_tidy)
+
+ws9_tidy$site = "WS9"
+
+ws9_sum <- ws9_tidy %>% group_by(date, invert, size, site) %>% summarize(count_sum = sum(count_new))  
+```
+
+# Step 3: 
+Repeat the process of data cleaning with the data from HBK
+```{r }
+hbk <- read.csv("Sticky trap data - HBK.csv")
+
+hbk_tidy <- hbk %>% gather("Dipteran_Large", "Terrestrial_Large" ,"Caddisfly_Large" ,
+                           "Mayfly_Large","Stonefly_Large","Other_Large","Dipteran_Small" ,"Terrestrial_Small",
+                           "Other_Small", key = "invert_size", value = "count_NA") %>% 
+  
+  #step 5, we're going to make invert and size into separate columns by piping this into the separate functio. 
+  separate(invert_size, into = c("invert", "size"), sep = "_") %>% 
+  
+  #step 6, we're going to substitute the NA's in the count column with zeroes by piping into a for loop
+  #and using the mutate function
+  mutate(count = ifelse(is.na(count_NA)==TRUE, 0, count_NA)) %>% 
+
+  
+  
+  #step 7, remove the count_NA column using select from dplyr.
+  dplyr::select(-count_NA) %>% 
+  
+  #step 8, format the dates using dplyr
+  mutate(date = lubridate::mdy(Date)) %>% 
+  dplyr::select(-Date) %>% 
+  dplyr::select(date, Trap, invert, size, count) 
+```
+ 
+ and the labelling to make it easy later. 
+```{r }
+ hbk_tidy$site = "HBK"
+
+hbk_sum <- hbk_tidy %>% group_by(date, invert, size, site) %>% summarize(count_sum = sum(count))
+head(hbk_sum)
+```
+
+# Step 4: Graphing
+The first graph I made with this data counted the number of dipterans collected from HBK over time. Then, do the same for watershed 9
+```{r}
+#here's the graph for hbk's dipts alone
+ggplot(hbk_sum %>% filter(invert == "Dipteran"), aes( date, count_sum)) + 
+  geom_bar(stat = "identity")+ ggtitle("HBK")+ labs(x= "Date", y = "Number of Diptera")
+
+#here's the graph we're going to use for ws9
+ggplot(ws9_sum %>% filter(invert == "Dipteran"), aes(x = date, y = count_sum)) + 
+  geom_bar(stat = "identity")+ ggtitle("WS9")+ labs(x= "Date", y = "Number of Diptera")
+
+```
+
+Then, we joined the two data sets together and graph them together. 
+```{r}
+#push the two dataframes together 
+
+hbk_ws9 <- full_join(hbk_sum, ws9_sum)
+
+#and here's how we put them on top of each other
+ggplot(hbk_ws9 %>% filter(invert == "Dipteran"), aes(fill = site, x = date, y = count_sum)) +
+  geom_bar(stat = "identity")
+
+```
+
+
