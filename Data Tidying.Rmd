@@ -1,0 +1,94 @@
+---
+title: "Data tidying"
+author: "Tyler Edwards"
+date: "2/28/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#note: this is how you read data from your github into an rmarkdown file! pretty cool!
+allBug_raw <- "https://raw.githubusercontent.com/tge4/HBK-bugs-summer-2019/master/All%20watersheds.csv"
+allBug <- read.csv(allBug_raw)
+```
+
+## Preview: The Data I collected (Untidy!)
+
+Over the summer of 2019 I compiled my data into the excel spreadsheet "All Watersheds."It contains the following columns: 
+*Watershed- The part of Hubbard Brook where the bugs came from (1, 2, 3, 6, or 9)
+*Date- The date when the 10 fly traps were put out above the stream (I'm not entirely sure, it could be the date when they were collected)
+*Trap- I gave each side of the 5 traps a number from 1-10 so I could go back and recount if needed.
+*Bug types-The next several columns are the type of insect and the size. The observations in these rows represent how many insects of each type were seen on an individual side of one of the 5 traps. They were labeled with the insect's order (I used "dipteran" to mean members of the order _Diptera_) and the size. Large = body length greater than 5mm, Small = body length less than 5mm. The individual groups were as follows: 
+    *Dipteran_Large
+    *Terrestrial_Large
+    *Caddisfly_Large
+    *Mayfly_Large
+    *Stonefly_Large
+    *Other_Large
+    *Dipteran_Small
+    *Terrestrial_Small
+    *Other_Small
+The dataset itself can be previewed here: 
+```{r cars}
+head(allBug)
+```
+
+Note that the data includes lots of NA's which are bad for data analysis. 
+
+# Data Cleaning
+
+
+### Step 1- Necessary packages
+
+I'm relying on the tidyverse to make my data look pretty, so we need the tidyr package. I also use the dplyr package for a few objects. 
+```{r, echo = TRUE, results = 'hide'}
+library("tidyr")
+library("dplyr")
+library("lubridate")
+```
+
+
+### Step 2- Column Names
+
+My first step in cleaning the data was to fix the columns so that there was one column saying what type of macroinvertebrate was collected and one column saying how big it was. Gather and separate are from the tidyr package. 
+
+```{r pressure}
+allBug_column <- allBug %>% 
+  gather("Dipteran_Large","Terrestrial_Large","Caddisfly_Large","Mayfly_Large","Stonefly_Large",
+         "Other_Large","Dipteran_Small","Terrestrial_Small", "Other_Small", key ="invert_size", value = "count")%>%
+  separate(invert_size, into=c("invert", "size"), sep = "_") 
+
+head(allBug_column)
+  
+```
+
+### Step 3- Removing the NA
+
+I used the mutate() function and an if else statement to make a new column in the table where every NA is replaced by a zero, and then deleted the original column with the counts of the bugs. and an if else statement to turn all of those pesky NA's into zeroes.
+
+```{r}
+ 
+allBug_Zero <- allBug_column %>% mutate(count_zero = ifelse(is.na(count)==TRUE, 0, count)) %>% dplyr::select(-count)  
+
+head(allBug_Zero)
+```
+
+### Step 4- Date formatting
+
+Finally, I use lubridate to make the date into a format that R can understand. 
+```{r}
+allBug_tidy <-  allBug_Zero %>%  mutate(date = lubridate::mdy(Date)) %>% 
+  dplyr::select(-Date) %>% 
+  dplyr::select(Watershed, date, Trap, invert, size, count_zero) 
+
+head(allBug_tidy)
+```
+
+### Step 5- Saving the data as a new .csv file
+
+Now, we make a new file containing the tidied data to upload to github. 
+
+```{r}
+write.csv(allBug_tidy, "TidyData.csv", row.names = F)
+```
+
